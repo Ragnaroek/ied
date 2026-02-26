@@ -1,94 +1,101 @@
 use eframe::egui;
-use egui::{CentralPanel, Color32, Frame, Pos2, Rect, RichText, ScrollArea, Stroke, vec2};
+
+use crate::wolf::WolfEditor;
+
+pub trait EditorWidget {
+    fn show(&mut self, ctx: &egui::Context);
+}
 
 pub struct IEd {
-    menu_expanded: bool,
-    selected_cell: Option<(usize, usize)>,
+    editor: Option<Box<dyn EditorWidget>>,
 }
+
+const NUM_START_TILES: usize = 2;
+const TILE_DIMENSION: f32 = 200.0;
 
 impl eframe::App for IEd {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Top panel for the burger menu button
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                // Burger menu button
-                if ui.button("☰").clicked() {
-                    self.menu_expanded = !self.menu_expanded;
-                }
-                ui.label("IED");
+        if let Some(editor) = &mut self.editor {
+            editor.show(ctx);
+        } else {
+            // placeholder startpage, will be made nicer
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let width = ui.available_width();
+                ui.with_layout(
+                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                    |ui| {
+                        ui.horizontal(|ui| {
+                            ui.add_space((width - (NUM_START_TILES as f32 * TILE_DIMENSION)) / 2.0);
+
+                            // Allocate space for the tiles
+                            let tile_size = egui::vec2(200.0, 200.0);
+
+                            // Wolfenstein 3D Tile
+                            egui::Frame::dark_canvas(ui.style())
+                                .stroke(egui::Stroke::new(
+                                    2.0,
+                                    egui::Color32::from_rgb(0, 128, 128),
+                                ))
+                                .show(ui, |ui| {
+                                    ui.set_width(tile_size.x);
+                                    ui.set_height(tile_size.y);
+                                    ui.vertical_centered(|ui| {
+                                        ui.label(
+                                            egui::RichText::new("Wolfenstein 3D")
+                                                .color(egui::Color32::WHITE)
+                                                .size(16.0),
+                                        );
+                                        ui.separator();
+                                        if ui.button("Create").clicked() {
+                                            println!("Create Wolfenstein 3D Map");
+                                        }
+                                        if ui.button("Edit").clicked() {
+                                            println!("Edit Wolfenstein 3D Map");
+                                        }
+                                        ui.add_space(25.0);
+                                        ui.label(
+                                            "You need to upload the following files for edit:",
+                                        );
+                                        ui.label("GAMEMAPS.WLX");
+                                        ui.label("MAPHEAD.WLX");
+                                        ui.label("VSWAP.WLX");
+                                    });
+                                });
+
+                            // Doom Tile
+                            egui::Frame::dark_canvas(ui.style())
+                                .stroke(egui::Stroke::new(
+                                    2.0,
+                                    egui::Color32::from_rgb(255, 60, 60),
+                                ))
+                                .show(ui, |ui| {
+                                    ui.set_width(tile_size.x);
+                                    ui.set_height(tile_size.y);
+                                    ui.vertical_centered(|ui| {
+                                        ui.label(
+                                            egui::RichText::new("Doom")
+                                                .color(egui::Color32::WHITE)
+                                                .size(16.0),
+                                        );
+                                        ui.separator();
+                                        if ui.button("Create").clicked() {
+                                            println!("Create Doom Map");
+                                        }
+                                        if ui.button("Edit").clicked() {
+                                            println!("Edit Doom Map");
+                                        }
+                                    });
+                                });
+                        });
+                    },
+                );
             });
-        });
-
-        let menu_width = if self.menu_expanded { 200.0 } else { 40.0 };
-        egui::SidePanel::left("menu_panel")
-            .resizable(false)
-            .width_range(menu_width..=menu_width)
-            .show(ctx, |ui| {
-                if self.menu_expanded {
-                    ui.vertical(|ui| {
-                        ui.label("Editor");
-                        ui.label("Graphics");
-                        ui.label("Texture/Sprites");
-                    });
-                } else {
-                    // Show only icons or minimal UI when collapsed
-                    ui.vertical_centered(|ui| {
-                        ui.label("TODO");
-                    });
-                }
-            });
-
-        egui::SidePanel::right("detail_panel")
-            .min_width(250.0)
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    if let Some((x, y)) = self.selected_cell {
-                        ui.label(format!("x: {}, y: {}", x, y));
-                    }
-                });
-            });
-
-        CentralPanel::default().show(ctx, |ui| {
-            let spacing = &mut ui.style_mut().spacing;
-            spacing.item_spacing = egui::vec2(0.0, 0.0);
-            spacing.button_padding = egui::vec2(0.0, 0.0);
-            ScrollArea::both().show(ui, |ui| {
-                let cell_rect = ui.available_width() / 64.0;
-                for row in 0..64 {
-                    ui.horizontal(|ui| {
-                        for col in 0..64 {
-                            let (rect, response) =
-                                ui.allocate_exact_size(vec2(20.0, 20.0), egui::Sense::click());
-
-                            if response.clicked() {
-                                self.selected_cell = Some((row, col));
-                            }
-
-                            if self.selected_cell == Some((row, col)) {
-                                ui.painter()
-                                    .rect_filled(rect, 0.0, egui::Color32::LIGHT_BLUE);
-                            }
-
-                            ui.painter().rect_stroke(
-                                rect,
-                                0.0,
-                                egui::Stroke::new(0.5, egui::Color32::GRAY),
-                                egui::StrokeKind::Outside,
-                            );
-                        }
-                    });
-                }
-            });
-            ui.label("ied");
-        });
+        }
     }
 }
 
 impl IEd {
     pub fn new(cc: &eframe::CreationContext<'_>) -> IEd {
-        IEd {
-            menu_expanded: true,
-            selected_cell: None,
-        }
+        IEd { editor: None }
     }
 }

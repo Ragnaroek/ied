@@ -1,4 +1,5 @@
 mod app;
+mod wolf;
 
 use app::IEd;
 
