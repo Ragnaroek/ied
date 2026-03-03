@@ -1561,6 +1561,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ied"
+version = "0.1.0"
+dependencies = [
+ "catppuccin-egui",
+ "eframe",
+ "egui",
+ "egui-phosphor",
+ "gloo-net",
+ "image",
+ "iron-wolf",
+ "log",
+ "poll-promise",
+ "rfd",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "image"
 version = "0.25.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1604,26 +1622,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
-]
-
-[[package]]
-name = "iron-wolf-webplayer"
-version = "0.1.0"
-dependencies = [
- "catppuccin-egui",
- "eframe",
- "egui",
- "egui-phosphor",
- "gloo-net",
- "image",
- "iron-wolf",
- "js-sys",
- "log",
- "poll-promise",
- "rfd",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
