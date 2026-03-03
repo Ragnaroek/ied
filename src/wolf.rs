@@ -16,7 +16,8 @@ pub struct WolfEditor {
 
 impl EditorWidget for WolfEditor {
     fn show(&mut self, ctx: &egui::Context) {
-        // Top panel for the burger menu button
+        catppuccin_egui::set_theme(&ctx, catppuccin_egui::LATTE);
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Burger menu button
