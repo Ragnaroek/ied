@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use eframe::egui;
 use eframe::egui::{Button, Color32, ColorImage, Pos2, RichText, Vec2};
-use egui::{Align2, FontDefinitions, FontFamily, FontId, Frame, Label, Rect, TextureHandle};
+use egui::{FontDefinitions, FontFamily, Frame, Label, Rect, Response, TextureHandle};
 use poll_promise::Promise;
 
-use crate::wolf::WolfEditor;
+use crate::wolf::{WolfEditor, WolfFiles};
 
 pub struct FileUpload {
     pub name: String,
@@ -23,8 +23,6 @@ pub struct IEd {
     disk_image: TextureHandle,
 }
 
-const NUM_START_TILES: usize = 2;
-const TILE_DIMENSION: f32 = 200.0;
 const DISK_PADDING: f32 = 10.0;
 
 const BUTTON_BACKGROUND: Color32 = Color32::from_rgb(30, 58, 80);
@@ -34,6 +32,8 @@ const FONT_NAME: &str = "press_start_2p";
 
 impl eframe::App for IEd {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.handle_file_upload();
+
         if let Some(editor) = &mut self.editor {
             editor.show(ctx);
         } else {
@@ -49,12 +49,23 @@ impl eframe::App for IEd {
                     let h_disk = self.disk_image.size()[1] as f32;
                     let y = h / 2.0 - h_disk / 2.0;
 
-                    self.render_disk_tile(
-                        ui,
-                        Pos2::new(w / 2.0 - w_disk - DISK_PADDING, y),
-                        Color32::from_rgb(0xE1, 0x41, 0x35),
-                        "WOLFENSTEIN 3-D",
-                    );
+                    if self
+                        .render_disk_tile(
+                            ui,
+                            Pos2::new(w / 2.0 - w_disk - DISK_PADDING, y),
+                            Color32::from_rgb(0xE1, 0x41, 0x35),
+                            "WOLFENSTEIN 3-D",
+                        )
+                        .clicked()
+                    {
+                        let egui_ctx = ui.ctx().clone();
+                        self.wolf_edit_file_promise =
+                            Some(poll_promise::Promise::spawn_local(async move {
+                                let file_uploads = open_files().await;
+                                egui_ctx.request_repaint();
+                                file_uploads
+                            }));
+                    };
                     self.render_disk_tile(
                         ui,
                         Pos2::new(w / 2.0 + DISK_PADDING, y),
@@ -86,7 +97,54 @@ impl IEd {
         }
     }
 
-    fn render_disk_tile(&self, ui: &mut egui::Ui, pos: Pos2, colour: Color32, text: &str) {
+    fn handle_file_upload(&mut self) {
+        if let Some(upload_promise) = &self.wolf_edit_file_promise {
+            if let Some(file_uploads) = upload_promise.ready() {
+                if file_uploads.is_empty() {
+                    return;
+                }
+
+                if file_uploads.len() < 3 {
+                    // TODO show a dialog or something about a wrong file upload
+                    return;
+                }
+
+                let mut wolf_files = WolfFiles {
+                    map_file: Vec::with_capacity(0),
+                    header_file: Vec::with_capacity(0),
+                    game_data_file: Vec::with_capacity(0),
+                };
+
+                let mut found_files = 0;
+                for file_upload in file_uploads {
+                    if file_upload.name == "GAMEMAPS.WL6".to_string() {
+                        wolf_files.map_file = file_upload.bytes.clone();
+                        found_files += 1;
+                    } else if file_upload.name == "MAPHEAD.WL6".to_string() {
+                        wolf_files.header_file = file_upload.bytes.clone();
+                        found_files += 1;
+                    } else if file_upload.name == "VSWAP.WL6".to_string() {
+                        wolf_files.game_data_file = file_upload.bytes.clone();
+                        found_files += 1;
+                    }
+                }
+                self.wolf_edit_file_promise = None;
+
+                if found_files == 3 {
+                    self.editor = Some(Box::new(WolfEditor::new(wolf_files)));
+                }
+                // TODO err dialog if files do not match
+            }
+        }
+    }
+
+    fn render_disk_tile(
+        &self,
+        ui: &mut egui::Ui,
+        pos: Pos2,
+        colour: Color32,
+        text: &str,
+    ) -> Response {
         let h = self.disk_image.size()[0] as f32;
         let w = self.disk_image.size()[1] as f32;
         let rect = Rect::from_min_size(pos, Vec2::new(w, h));
@@ -126,7 +184,7 @@ impl IEd {
             .fill(BUTTON_BACKGROUND)
             .corner_radius(4.0),
         );
-        ui.put(
+        let edit_respone = ui.put(
             Rect::from_min_size(
                 Pos2::new(button_pos.x, button_pos.y + button_size.y + 10.0),
                 button_size,
@@ -141,9 +199,8 @@ impl IEd {
             .fill(BUTTON_BACKGROUND)
             .corner_radius(4.0),
         );
+        edit_respone
     }
-
-    fn start_edit_wolf(&mut self) {}
 }
 
 fn setup_font(ctx: &egui::Context) {
@@ -163,11 +220,16 @@ fn setup_font(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
-pub async fn open_file() -> FileUpload {
-    let file = rfd::AsyncFileDialog::new().pick_file().await.unwrap();
-    let bytes = file.read().await;
-    FileUpload {
-        name: file.file_name(),
-        bytes,
+pub async fn open_files() -> Vec<FileUpload> {
+    let files = rfd::AsyncFileDialog::new().pick_files().await.unwrap();
+
+    let mut result = Vec::with_capacity(files.len());
+    for file in files {
+        let bytes = file.read().await;
+        result.push(FileUpload {
+            name: file.file_name(),
+            bytes,
+        })
     }
+    result
 }

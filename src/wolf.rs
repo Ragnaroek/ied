@@ -1,19 +1,21 @@
 use egui::{CentralPanel, ScrollArea, vec2};
 
+use crate::app::EditorWidget;
+
+pub struct WolfFiles {
+    pub map_file: Vec<u8>,
+    pub header_file: Vec<u8>,
+    pub game_data_file: Vec<u8>,
+}
+
 pub struct WolfEditor {
+    files: WolfFiles,
     menu_expanded: bool,
     selected_cell: Option<(usize, usize)>,
 }
 
-impl WolfEditor {
-    pub fn new() -> WolfEditor {
-        WolfEditor {
-            menu_expanded: true,
-            selected_cell: None,
-        }
-    }
-
-    pub fn show(&mut self, ctx: &egui::Context) {
+impl EditorWidget for WolfEditor {
+    fn show(&mut self, ctx: &egui::Context) {
         // Top panel for the burger menu button
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -88,5 +90,15 @@ impl WolfEditor {
                 }
             });
         });
+    }
+}
+
+impl WolfEditor {
+    pub fn new(files: WolfFiles) -> WolfEditor {
+        WolfEditor {
+            files,
+            menu_expanded: true,
+            selected_cell: None,
+        }
     }
 }
