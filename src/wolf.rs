@@ -14,6 +14,16 @@ pub struct WolfEditor {
     selected_cell: Option<(usize, usize)>,
 }
 
+impl WolfEditor {
+    pub fn new(files: WolfFiles) -> WolfEditor {
+        WolfEditor {
+            files,
+            menu_expanded: true,
+            selected_cell: None,
+        }
+    }
+}
+
 impl EditorWidget for WolfEditor {
     fn show(&mut self, ctx: &egui::Context) {
         catppuccin_egui::set_theme(&ctx, catppuccin_egui::LATTE);
@@ -24,7 +34,7 @@ impl EditorWidget for WolfEditor {
                 if ui.button("☰").clicked() {
                     self.menu_expanded = !self.menu_expanded;
                 }
-                ui.label("IED");
+                ui.label("Wolfenstein 3-D");
             });
         });
 
@@ -91,15 +101,5 @@ impl EditorWidget for WolfEditor {
                 }
             });
         });
-    }
-}
-
-impl WolfEditor {
-    pub fn new(files: WolfFiles) -> WolfEditor {
-        WolfEditor {
-            files,
-            menu_expanded: true,
-            selected_cell: None,
-        }
     }
 }

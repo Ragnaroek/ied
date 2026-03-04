@@ -30,53 +30,6 @@ const BACKGROUND_COLOR: Color32 = egui::Color32::from_rgb(0x38, 0x4C, 0x71);
 
 const FONT_NAME: &str = "press_start_2p";
 
-impl eframe::App for IEd {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.handle_file_upload();
-
-        if let Some(editor) = &mut self.editor {
-            editor.show(ctx);
-        } else {
-            egui::CentralPanel::default()
-                .frame(Frame::NONE)
-                .show(ctx, |ui| {
-                    ui.painter()
-                        .rect_filled(ui.max_rect(), 0.0, BACKGROUND_COLOR);
-
-                    let w = ui.available_width();
-                    let h = ui.available_height();
-                    let w_disk = self.disk_image.size()[0] as f32;
-                    let h_disk = self.disk_image.size()[1] as f32;
-                    let y = h / 2.0 - h_disk / 2.0;
-
-                    if self
-                        .render_disk_tile(
-                            ui,
-                            Pos2::new(w / 2.0 - w_disk - DISK_PADDING, y),
-                            Color32::from_rgb(0xE1, 0x41, 0x35),
-                            "WOLFENSTEIN 3-D",
-                        )
-                        .clicked()
-                    {
-                        let egui_ctx = ui.ctx().clone();
-                        self.wolf_edit_file_promise =
-                            Some(poll_promise::Promise::spawn_local(async move {
-                                let file_uploads = open_files().await;
-                                egui_ctx.request_repaint();
-                                file_uploads
-                            }));
-                    };
-                    self.render_disk_tile(
-                        ui,
-                        Pos2::new(w / 2.0 + DISK_PADDING, y),
-                        Color32::from_rgb(0x59, 0xBE, 0xB0),
-                        "DOOM",
-                    );
-                });
-        }
-    }
-}
-
 impl IEd {
     pub fn new(cc: &eframe::CreationContext<'_>) -> IEd {
         let image_bytes = include_bytes!("../assets/floppy_disk.png");
@@ -90,8 +43,13 @@ impl IEd {
 
         setup_font(&cc.egui_ctx);
 
+        let editor: Option<Box<dyn EditorWidget>> = None;
+
+        #[cfg(feature = "debug")]
+        let editor: Option<Box<dyn EditorWidget>> = Some(Box::new(debug_init_wolf_editor()));
+
         IEd {
-            editor: None,
+            editor,
             wolf_edit_file_promise: None,
             disk_image: texture,
         }
@@ -201,6 +159,68 @@ impl IEd {
         );
         edit_respone
     }
+}
+
+impl eframe::App for IEd {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.handle_file_upload();
+
+        if let Some(editor) = &mut self.editor {
+            editor.show(ctx);
+        } else {
+            egui::CentralPanel::default()
+                .frame(Frame::NONE)
+                .show(ctx, |ui| {
+                    ui.painter()
+                        .rect_filled(ui.max_rect(), 0.0, BACKGROUND_COLOR);
+
+                    let w = ui.available_width();
+                    let h = ui.available_height();
+                    let w_disk = self.disk_image.size()[0] as f32;
+                    let h_disk = self.disk_image.size()[1] as f32;
+                    let y = h / 2.0 - h_disk / 2.0;
+
+                    if self
+                        .render_disk_tile(
+                            ui,
+                            Pos2::new(w / 2.0 - w_disk - DISK_PADDING, y),
+                            Color32::from_rgb(0xE1, 0x41, 0x35),
+                            "WOLFENSTEIN 3-D",
+                        )
+                        .clicked()
+                    {
+                        let egui_ctx = ui.ctx().clone();
+                        self.wolf_edit_file_promise =
+                            Some(poll_promise::Promise::spawn_local(async move {
+                                let file_uploads = open_files().await;
+                                egui_ctx.request_repaint();
+                                file_uploads
+                            }));
+                    };
+                    self.render_disk_tile(
+                        ui,
+                        Pos2::new(w / 2.0 + DISK_PADDING, y),
+                        Color32::from_rgb(0x59, 0xBE, 0xB0),
+                        "DOOM",
+                    );
+                });
+        }
+    }
+}
+
+#[cfg(feature = "debug")]
+fn debug_init_wolf_editor() -> WolfEditor {
+    let map_file = include_bytes!("../testdata/GAMEMAPS.WL1").into();
+    let header_file = include_bytes!("../testdata/MAPHEAD.WL1").into();
+    let game_data_file = include_bytes!("../testdata/VSWAP.WL1").into();
+
+    let mut wolf_files = WolfFiles {
+        map_file,
+        header_file: header_file,
+        game_data_file: game_data_file,
+    };
+
+    WolfEditor::new(wolf_files)
 }
 
 fn setup_font(ctx: &egui::Context) {
