@@ -5,7 +5,7 @@ use eframe::egui::{Button, Color32, ColorImage, Pos2, RichText, Vec2};
 use egui::{FontDefinitions, FontFamily, Frame, Label, Rect, Response, TextureHandle};
 use poll_promise::Promise;
 
-use crate::wolf::{WolfEditor, WolfFiles};
+use crate::wolf::{WolfEditor, WolfUpload};
 
 pub struct FileUpload {
     pub name: String,
@@ -67,7 +67,7 @@ impl IEd {
                     return;
                 }
 
-                let mut wolf_files = WolfFiles {
+                let mut wolf_files = WolfUpload {
                     map_file: Vec::with_capacity(0),
                     header_file: Vec::with_capacity(0),
                     game_data_file: Vec::with_capacity(0),
@@ -89,7 +89,7 @@ impl IEd {
                 self.wolf_edit_file_promise = None;
 
                 if found_files == 3 {
-                    self.editor = Some(Box::new(WolfEditor::new(wolf_files)));
+                    self.editor = Some(Box::new(WolfEditor::new(wolf_files).expect("editor")));
                 }
                 // TODO err dialog if files do not match
             }
@@ -214,13 +214,13 @@ fn debug_init_wolf_editor() -> WolfEditor {
     let header_file = include_bytes!("../testdata/MAPHEAD.WL1").into();
     let game_data_file = include_bytes!("../testdata/VSWAP.WL1").into();
 
-    let mut wolf_files = WolfFiles {
+    let mut wolf_files = WolfUpload {
         map_file,
         header_file: header_file,
         game_data_file: game_data_file,
     };
 
-    WolfEditor::new(wolf_files)
+    WolfEditor::new(wolf_files).expect("editor")
 }
 
 fn setup_font(ctx: &egui::Context) {
