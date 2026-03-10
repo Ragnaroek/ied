@@ -1,19 +1,28 @@
-use egui::{CentralPanel, Pos2, Rect, Vec2};
-use iw::map::{MapFileType, MapSegs, MapType};
+use egui::{CentralPanel, ColorImage, Pos2, Rect, TextureHandle, Vec2};
+use iw::{
+    gamedata::{GamedataHeaders, TextureData},
+    map::{MapFileType, MapSegs, MapType},
+};
+use std::collections::HashMap;
 use std::io::Cursor;
 
 use crate::app::EditorWidget;
 
+const TEXTURE_WIDTH: usize = 64;
+const TEXTURE_HEIGHT: usize = 64;
+
 pub struct WolfUpload {
     pub map_file: Vec<u8>,
-    pub header_file: Vec<u8>,
+    pub map_header_file: Vec<u8>,
     pub game_data_file: Vec<u8>,
 }
 
-struct WolfFiles {
+struct WolfData {
     offsets: MapFileType,
-    headers: Vec<MapType>,
+    map_headers: Vec<MapType>,
     map_data: Vec<u8>,
+    game_data: Vec<u8>,
+    game_data_headers: GamedataHeaders,
 }
 
 #[derive(Copy, Clone)]
@@ -21,32 +30,89 @@ struct Tile {
     x: usize,
     y: usize,
     wall: u16,
+    info: u16,
 }
 
 pub struct WolfEditor {
-    files: WolfFiles,
+    data: WolfData,
     map: MapSegs,
     menu_expanded: bool,
     selected_tile: Option<Tile>,
+
+    textures: HashMap<String, TextureHandle>,
 }
 
 impl WolfEditor {
     pub fn new(files: WolfUpload) -> Result<WolfEditor, String> {
-        let offsets = iw::map::load_map_offsets(&files.header_file)?;
-        let (offsets, headers) = iw::map::load_map_headers(&files.map_file, offsets)?;
+        let offsets = iw::map::load_map_offsets(&files.map_header_file)?;
+        let (offsets, map_headers) = iw::map::load_map_headers(&files.map_file, offsets)?;
         let mut cursor = Cursor::new(&files.map_file);
-        let map = iw::map::load_map(&mut cursor, &headers, &offsets, 0)?;
+        let map = iw::map::load_map(&mut cursor, &map_headers, &offsets, 0)?;
+
+        let game_data_headers = iw::gamedata::load_gamedata_headers(&files.game_data_file)?;
 
         Ok(WolfEditor {
-            files: WolfFiles {
+            data: WolfData {
                 offsets,
-                headers,
+                map_headers,
                 map_data: files.map_file,
+                game_data: files.game_data_file,
+                game_data_headers,
             },
             map,
             menu_expanded: true,
             selected_tile: None,
+            textures: HashMap::new(),
         })
+    }
+
+    fn texture_image(
+        &mut self,
+        ui: &mut egui::Ui,
+        key: String,
+        texture: &TextureData,
+    ) -> TextureHandle {
+        if let Some(handle) = self.textures.get(&key) {
+            log::debug!("using cached texture!");
+            return handle.clone();
+        }
+
+        let mut image_data = vec![0; TEXTURE_WIDTH * TEXTURE_HEIGHT * 3];
+        for x in 0..TEXTURE_WIDTH {
+            for y in 0..TEXTURE_HEIGHT {
+                let ix = TEXTURE_WIDTH * y + x;
+                let colour = iw::assets::gamepal_color(texture.bytes[ix] as usize);
+                image_data[ix * 3 + 0] = colour.r;
+                image_data[ix * 3 + 1] = colour.g;
+                image_data[ix * 3 + 2] = colour.b;
+            }
+        }
+
+        let image = ColorImage::from_rgb([TEXTURE_WIDTH, TEXTURE_HEIGHT], &image_data);
+        let handle = ui.ctx().load_texture(&key, image, Default::default());
+        self.textures.insert(key, handle.clone());
+        handle
+    }
+
+    fn render_texture(&mut self, ui: &mut egui::Ui, which: u16, dir: bool) {
+        let header = &self.data.game_data_headers.headers
+            [(which as usize - 1) * 2 + if dir { 1 } else { 0 }];
+        if header.length == 4096 {
+            let texture =
+                iw::gamedata::load_texture(&mut Cursor::new(&self.data.game_data), header)
+                    .expect("texture");
+            let img = self.texture_image(
+                ui,
+                format!("{}-wall{}", if dir { "v" } else { "h" }, which),
+                &texture,
+            );
+            if dir {
+                ui.label("vertical:");
+            } else {
+                ui.label("horizontal:");
+            }
+            ui.image(&img);
+        }
     }
 }
 
@@ -95,8 +161,9 @@ impl EditorWidget for WolfEditor {
                 for y in 0..64 {
                     let ptr = y * 64 + x;
                     let wall = self.map.segs[0][ptr];
+                    let info = self.map.segs[1][ptr];
 
-                    let tile = Tile { x, y, wall };
+                    let tile = Tile { x, y, wall, info };
 
                     let rect = Rect::from_min_size(
                         Pos2::new(
@@ -158,9 +225,21 @@ impl EditorWidget for WolfEditor {
                 });
                 ui.separator();
 
-                if let Some(selected) = &self.selected_tile {
+                let wall = if let Some(selected) = &self.selected_tile {
                     ui.label(format!("x: {}, y: {}", selected.x, selected.y));
                     ui.label(format!("Wall Tile: {}", selected.wall));
+                    ui.label(format!("Info Tile: {}", selected.info));
+                    Some(selected.wall)
+                } else {
+                    ui.label("Nothing selected");
+                    None
+                };
+
+                if let Some(wall) = wall {
+                    ui.add_space(10.0);
+                    self.render_texture(ui, wall, true);
+                    ui.add_space(10.0);
+                    self.render_texture(ui, wall, false);
                 }
 
                 ui.add_space(30.0);

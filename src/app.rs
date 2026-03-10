@@ -69,7 +69,7 @@ impl IEd {
 
                 let mut wolf_files = WolfUpload {
                     map_file: Vec::with_capacity(0),
-                    header_file: Vec::with_capacity(0),
+                    map_header_file: Vec::with_capacity(0),
                     game_data_file: Vec::with_capacity(0),
                 };
 
@@ -79,7 +79,7 @@ impl IEd {
                         wolf_files.map_file = file_upload.bytes.clone();
                         found_files += 1;
                     } else if file_upload.name == "MAPHEAD.WL6".to_string() {
-                        wolf_files.header_file = file_upload.bytes.clone();
+                        wolf_files.map_header_file = file_upload.bytes.clone();
                         found_files += 1;
                     } else if file_upload.name == "VSWAP.WL6".to_string() {
                         wolf_files.game_data_file = file_upload.bytes.clone();
@@ -216,7 +216,7 @@ fn debug_init_wolf_editor() -> WolfEditor {
 
     let mut wolf_files = WolfUpload {
         map_file,
-        header_file: header_file,
+        map_header_file: header_file,
         game_data_file: game_data_file,
     };
 
