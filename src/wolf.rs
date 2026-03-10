@@ -73,7 +73,6 @@ impl WolfEditor {
         texture: &TextureData,
     ) -> TextureHandle {
         if let Some(handle) = self.textures.get(&key) {
-            log::debug!("using cached texture!");
             return handle.clone();
         }
 
@@ -114,10 +113,43 @@ impl WolfEditor {
             ui.image(&img);
         }
     }
+
+    fn handle_keys(&mut self, ctx: &egui::Context) {
+        let mut dis = None;
+        if ctx.input(|i| i.key_down(egui::Key::ArrowUp)) {
+            dis = Some((0, -1));
+        }
+        if ctx.input(|i| i.key_down(egui::Key::ArrowDown)) {
+            dis = Some((0, 1));
+        }
+        if ctx.input(|i| i.key_down(egui::Key::ArrowLeft)) {
+            dis = Some((-1, 0));
+        }
+        if ctx.input(|i| i.key_down(egui::Key::ArrowRight)) {
+            dis = Some((1, 0));
+        }
+
+        if let Some(dis) = dis
+            && let Some(selected) = self.selected_tile
+        {
+            let x = (selected.x as isize + dis.0).clamp(0, 63) as usize;
+            let y = (selected.y as isize + dis.1).clamp(0, 63) as usize;
+            self.selected_tile = Some(self.tile_at(x, y))
+        }
+    }
+
+    fn tile_at(&self, x: usize, y: usize) -> Tile {
+        let ptr = y * 64 + x;
+        let wall = self.map.segs[0][ptr];
+        let info = self.map.segs[1][ptr];
+        Tile { x, y, wall, info }
+    }
 }
 
 impl EditorWidget for WolfEditor {
     fn show(&mut self, ctx: &egui::Context) {
+        self.handle_keys(ctx);
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("☰").clicked() {
@@ -159,11 +191,7 @@ impl EditorWidget for WolfEditor {
             );
             for x in 0..64 {
                 for y in 0..64 {
-                    let ptr = y * 64 + x;
-                    let wall = self.map.segs[0][ptr];
-                    let info = self.map.segs[1][ptr];
-
-                    let tile = Tile { x, y, wall, info };
+                    let tile = self.tile_at(x, y);
 
                     let rect = Rect::from_min_size(
                         Pos2::new(
