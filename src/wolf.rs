@@ -1,4 +1,4 @@
-use egui::{CentralPanel, ColorImage, Pos2, Rect, TextureHandle, Vec2};
+use egui::{CentralPanel, ColorImage, Image, Pos2, Rect, TextureHandle, Vec2, emath::Rot2};
 use iw::{
     gamedata::{GamedataHeaders, TextureData},
     map::{MapFileType, MapSegs, MapType},
@@ -110,7 +110,10 @@ impl WolfEditor {
             } else {
                 ui.label("horizontal:");
             }
-            ui.image(&img);
+
+            let rotated_image =
+                Image::new(&img).rotate(std::f32::consts::PI / 2.0, egui::Vec2::splat(0.5));
+            ui.add(rotated_image);
         }
     }
 
