@@ -41,7 +41,7 @@ impl IEd {
             .egui_ctx
             .load_texture("logo", color_image, egui::TextureOptions::LINEAR);
 
-        setup_font(&cc.egui_ctx);
+        setup_fonts(&cc.egui_ctx);
 
         let editor: Option<Box<dyn EditorWidget>> = None;
 
@@ -223,7 +223,7 @@ fn debug_init_wolf_editor() -> WolfEditor {
     WolfEditor::new(wolf_files).expect("editor")
 }
 
-fn setup_font(ctx: &egui::Context) {
+fn setup_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 
     fonts.font_data.insert(
@@ -236,6 +236,8 @@ fn setup_font(ctx: &egui::Context) {
     fonts
         .families
         .insert(FontFamily::Monospace, vec![FONT_NAME.to_owned()]);
+
+    egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
     ctx.set_fonts(fonts);
 }

@@ -1,4 +1,4 @@
-use egui::{CentralPanel, ColorImage, Image, Pos2, Rect, TextureHandle, Vec2, emath::Rot2};
+use egui::{CentralPanel, Color32, ColorImage, Image, Pos2, Rect, RichText, TextureHandle, Vec2};
 use iw::{
     gamedata::{GamedataHeaders, TextureData},
     map::{MapFileType, MapSegs, MapType},
@@ -40,6 +40,37 @@ pub struct WolfEditor {
     selected_tile: Option<Tile>,
 
     textures: HashMap<String, TextureHandle>,
+}
+
+enum Dir {
+    North,
+    South,
+    West,
+    East,
+}
+
+impl Dir {
+    fn from_num(n: u16) -> Dir {
+        match n {
+            0 => Dir::North,
+            1 => Dir::East,
+            2 => Dir::South,
+            3 => Dir::West,
+            _ => Dir::North,
+        }
+    }
+
+    /// in radian
+    fn text_rotation(&self) -> f32 {
+        // text naturally faces to the east already
+        let degree = match self {
+            Dir::North => 270.0,
+            Dir::East => 0.0,
+            Dir::South => 90.0,
+            Dir::West => 180.0,
+        };
+        degree * (std::f32::consts::PI / 180.0)
+    }
 }
 
 impl WolfEditor {
@@ -212,7 +243,7 @@ impl EditorWidget for WolfEditor {
                         self.selected_tile = Some(tile);
                     }
 
-                    render_wall(ui, rect, &tile);
+                    render_tile(ui, rect, &tile);
 
                     if let Some(tile) = &self.selected_tile {
                         if tile.x == x && tile.y == y {
@@ -278,7 +309,7 @@ impl EditorWidget for WolfEditor {
     }
 }
 
-fn render_wall(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
+fn render_tile(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
     if tile.wall < 107 {
         ui.painter().rect_filled(rect, 0.0, egui::Color32::GRAY);
     } else {
@@ -288,5 +319,42 @@ fn render_wall(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
             egui::Stroke::new(0.5, egui::Color32::GRAY),
             egui::StrokeKind::Outside,
         );
+
+        let (info_icon, dir) = match tile.info {
+            19 | 20 | 21 | 22 => (
+                egui_phosphor::regular::ARROW_RIGHT,
+                Dir::from_num(tile.info - 19),
+            ),
+            _ => ("", Dir::North),
+        };
+
+        let galley = ui.painter().layout_no_wrap(
+            info_icon.to_string(),
+            egui::FontId::default(),
+            Color32::WHITE,
+        );
+        let (dis_x, dis_y) = match dir {
+            Dir::East => (0.0, 0.0),
+            Dir::South => (galley.size().x, 0.0),
+            Dir::West => (galley.size().x, galley.size().y),
+            Dir::North => (0.0, galley.size().y),
+        };
+        let x_pad = (rect.width() - galley.size().x) / 2.0;
+        let y_pad = (rect.height() - galley.size().y) / 2.0;
+
+        let text_shape = egui::Shape::Text(egui::epaint::TextShape {
+            pos: Pos2 {
+                x: rect.min.x + dis_x + x_pad,
+                y: rect.min.y + dis_y + y_pad,
+            },
+            galley,
+            underline: egui::Stroke::NONE,
+            override_text_color: None,
+            fallback_color: Color32::WHITE,
+            opacity_factor: 1.0,
+            angle: dir.text_rotation(),
+        });
+
+        ui.painter().add(text_shape);
     }
 }
