@@ -309,25 +309,36 @@ impl EditorWidget for WolfEditor {
     }
 }
 
+const GRID_COLOUR: Color32 = Color32::from_rgb(0x55, 0x55, 0x55);
+
 fn render_tile(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
-    if tile.wall < 107 {
-        ui.painter().rect_filled(rect, 0.0, egui::Color32::GRAY);
+    let tile_colour = if tile.wall < 107 {
+        Color32::from_rgb(0x84, 0x84, 0x84)
     } else {
-        ui.painter().rect_stroke(
-            rect,
-            0.0,
-            egui::Stroke::new(0.5, egui::Color32::GRAY),
-            egui::StrokeKind::Outside,
-        );
+        Color32::BLACK
+    };
 
-        let (info_icon, dir) = match tile.info {
-            19 | 20 | 21 | 22 => (
-                egui_phosphor::regular::ARROW_RIGHT,
-                Dir::from_num(tile.info - 19),
-            ),
-            _ => ("", Dir::North),
-        };
+    // background color of tile
+    ui.painter().rect_filled(rect, 0.0, tile_colour);
+    // grid
+    ui.painter().rect_stroke(
+        rect,
+        0.0,
+        egui::Stroke::new(1.0, GRID_COLOUR),
+        egui::StrokeKind::Outside,
+    );
 
+    // info layer
+
+    let (info_icon, dir) = match tile.info {
+        19 | 20 | 21 | 22 => (
+            egui_phosphor::regular::ARROW_RIGHT,
+            Dir::from_num(tile.info - 19),
+        ),
+        _ => ("", Dir::North),
+    };
+
+    if !info_icon.is_empty() {
         let galley = ui.painter().layout_no_wrap(
             info_icon.to_string(),
             egui::FontId::default(),
