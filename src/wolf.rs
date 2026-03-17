@@ -312,14 +312,8 @@ impl EditorWidget for WolfEditor {
 const GRID_COLOUR: Color32 = Color32::from_rgb(0x55, 0x55, 0x55);
 
 fn render_tile(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
-    let tile_colour = if tile.wall < 107 {
-        Color32::from_rgb(0x84, 0x84, 0x84)
-    } else {
-        Color32::BLACK
-    };
+    render_tile_background(ui, rect, tile.wall);
 
-    // background color of tile
-    ui.painter().rect_filled(rect, 0.0, tile_colour);
     // grid
     ui.painter().rect_stroke(
         rect,
@@ -368,4 +362,17 @@ fn render_tile(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
 
         ui.painter().add(text_shape);
     }
+}
+
+fn render_tile_background(ui: &mut egui::Ui, rect: Rect, wall: u16) {
+    let colour = if wall < 107 {
+        match wall {
+            8 => Color32::from_rgb(0x00, 0x00, 0x84),
+            _ => Color32::from_rgb(0x84, 0x84, 0x84),
+        }
+    } else {
+        Color32::BLACK
+    };
+
+    ui.painter().rect_filled(rect, 0.0, colour);
 }
