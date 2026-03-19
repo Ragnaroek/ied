@@ -97,7 +97,7 @@ impl WolfEditor {
         })
     }
 
-    fn texture_image(
+    fn wall_texture_image(
         &mut self,
         ui: &mut egui::Ui,
         key: String,
@@ -124,6 +124,118 @@ impl WolfEditor {
         handle
     }
 
+    fn checker_texture_image(&mut self, ui: &mut egui::Ui) -> TextureHandle {
+        let key = "checker";
+        if let Some(handle) = self.textures.get(key) {
+            return handle.clone();
+        }
+
+        let mut checker_data = vec![0u8; 8 * 8 * 4];
+        for y in 0..8 {
+            for x in 0..8 {
+                let i = (y * 8 + x) * 4;
+                let (color, alpha) = if (x / 2 + y / 2) % 2 == 0 {
+                    (0xFF, 0x00)
+                } else {
+                    (0x00, 0xFF)
+                };
+                checker_data[i] = color; // R
+                checker_data[i + 1] = color; // G
+                checker_data[i + 2] = color; // B
+                checker_data[i + 3] = alpha; // A
+            }
+        }
+
+        let handle = ui.ctx().load_texture(
+            "checker",
+            ColorImage::from_rgba_unmultiplied([8, 8], &checker_data),
+            Default::default(),
+        );
+        self.textures.insert(key.to_string(), handle.clone());
+        handle
+    }
+
+    fn render_tile(&mut self, ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
+        self.render_tile_background(ui, rect, tile.wall);
+
+        // grid
+        ui.painter().rect_stroke(
+            rect,
+            0.0,
+            egui::Stroke::new(1.0, GRID_COLOUR),
+            egui::StrokeKind::Outside,
+        );
+
+        // info layer
+
+        let (info_icon, dir) = match tile.info {
+            19 | 20 | 21 | 22 => (
+                egui_phosphor::regular::ARROW_RIGHT,
+                Dir::from_num(tile.info - 19),
+            ),
+            _ => ("", Dir::North),
+        };
+
+        if !info_icon.is_empty() {
+            let galley = ui.painter().layout_no_wrap(
+                info_icon.to_string(),
+                egui::FontId::default(),
+                Color32::WHITE,
+            );
+            let (dis_x, dis_y) = match dir {
+                Dir::East => (0.0, 0.0),
+                Dir::South => (galley.size().x, 0.0),
+                Dir::West => (galley.size().x, galley.size().y),
+                Dir::North => (0.0, galley.size().y),
+            };
+            let x_pad = (rect.width() - galley.size().x) / 2.0;
+            let y_pad = (rect.height() - galley.size().y) / 2.0;
+
+            let text_shape = egui::Shape::Text(egui::epaint::TextShape {
+                pos: Pos2 {
+                    x: rect.min.x + dis_x + x_pad,
+                    y: rect.min.y + dis_y + y_pad,
+                },
+                galley,
+                underline: egui::Stroke::NONE,
+                override_text_color: None,
+                fallback_color: Color32::WHITE,
+                opacity_factor: 1.0,
+                angle: dir.text_rotation(),
+            });
+
+            ui.painter().add(text_shape);
+        }
+    }
+
+    fn render_tile_background(&mut self, ui: &mut egui::Ui, rect: Rect, wall: u16) {
+        if wall < 107 {
+            match wall {
+                8 => self.bg_colour(ui, rect, Color32::from_rgb(0x00, 0x00, 0x84)),
+                9 => self.bg_checker(ui, rect, Color32::from_rgb(0x00, 0x00, 0x84)),
+                _ => self.bg_colour(ui, rect, Color32::from_rgb(0x84, 0x84, 0x84)),
+            }
+        } else {
+            self.bg_colour(ui, rect, Color32::BLACK);
+        };
+    }
+
+    fn bg_checker(&mut self, ui: &mut egui::Ui, rect: Rect, bg_colour: Color32) {
+        ui.painter().rect_filled(rect, 0.0, bg_colour);
+
+        let checker_tex = self.checker_texture_image(ui);
+        ui.painter().image(
+            checker_tex.id(),
+            rect,
+            Rect::from_min_max(Pos2 { x: 0.0, y: 0.0 }, Pos2 { x: 1.0, y: 1.0 }),
+            Color32::WHITE,
+        );
+    }
+
+    fn bg_colour(&self, ui: &mut egui::Ui, rect: Rect, colour: Color32) {
+        ui.painter().rect_filled(rect, 0.0, colour);
+    }
+
     fn render_texture(&mut self, ui: &mut egui::Ui, which: u16, dir: bool) {
         let header = &self.data.game_data_headers.headers
             [(which as usize - 1) * 2 + if dir { 1 } else { 0 }];
@@ -131,7 +243,7 @@ impl WolfEditor {
             let texture =
                 iw::gamedata::load_texture(&mut Cursor::new(&self.data.game_data), header)
                     .expect("texture");
-            let img = self.texture_image(
+            let img = self.wall_texture_image(
                 ui,
                 format!("{}-wall{}", if dir { "v" } else { "h" }, which),
                 &texture,
@@ -243,7 +355,7 @@ impl EditorWidget for WolfEditor {
                         self.selected_tile = Some(tile);
                     }
 
-                    render_tile(ui, rect, &tile);
+                    self.render_tile(ui, rect, &tile);
 
                     if let Some(tile) = &self.selected_tile {
                         if tile.x == x && tile.y == y {
@@ -310,69 +422,3 @@ impl EditorWidget for WolfEditor {
 }
 
 const GRID_COLOUR: Color32 = Color32::from_rgb(0x55, 0x55, 0x55);
-
-fn render_tile(ui: &mut egui::Ui, rect: Rect, tile: &Tile) {
-    render_tile_background(ui, rect, tile.wall);
-
-    // grid
-    ui.painter().rect_stroke(
-        rect,
-        0.0,
-        egui::Stroke::new(1.0, GRID_COLOUR),
-        egui::StrokeKind::Outside,
-    );
-
-    // info layer
-
-    let (info_icon, dir) = match tile.info {
-        19 | 20 | 21 | 22 => (
-            egui_phosphor::regular::ARROW_RIGHT,
-            Dir::from_num(tile.info - 19),
-        ),
-        _ => ("", Dir::North),
-    };
-
-    if !info_icon.is_empty() {
-        let galley = ui.painter().layout_no_wrap(
-            info_icon.to_string(),
-            egui::FontId::default(),
-            Color32::WHITE,
-        );
-        let (dis_x, dis_y) = match dir {
-            Dir::East => (0.0, 0.0),
-            Dir::South => (galley.size().x, 0.0),
-            Dir::West => (galley.size().x, galley.size().y),
-            Dir::North => (0.0, galley.size().y),
-        };
-        let x_pad = (rect.width() - galley.size().x) / 2.0;
-        let y_pad = (rect.height() - galley.size().y) / 2.0;
-
-        let text_shape = egui::Shape::Text(egui::epaint::TextShape {
-            pos: Pos2 {
-                x: rect.min.x + dis_x + x_pad,
-                y: rect.min.y + dis_y + y_pad,
-            },
-            galley,
-            underline: egui::Stroke::NONE,
-            override_text_color: None,
-            fallback_color: Color32::WHITE,
-            opacity_factor: 1.0,
-            angle: dir.text_rotation(),
-        });
-
-        ui.painter().add(text_shape);
-    }
-}
-
-fn render_tile_background(ui: &mut egui::Ui, rect: Rect, wall: u16) {
-    let colour = if wall < 107 {
-        match wall {
-            8 => Color32::from_rgb(0x00, 0x00, 0x84),
-            _ => Color32::from_rgb(0x84, 0x84, 0x84),
-        }
-    } else {
-        Color32::BLACK
-    };
-
-    ui.painter().rect_filled(rect, 0.0, colour);
-}
