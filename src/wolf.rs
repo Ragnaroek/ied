@@ -1,4 +1,6 @@
-use egui::{CentralPanel, Color32, ColorImage, Image, Pos2, Rect, RichText, TextureHandle, Vec2};
+use egui::{
+    CentralPanel, Color32, ColorImage, Image, Pos2, Rect, RichText, TextureHandle, TextureId, Vec2,
+};
 use iw::{
     gamedata::{GamedataHeaders, TextureData},
     map::{MapFileType, MapSegs, MapType},
@@ -97,12 +99,7 @@ impl WolfEditor {
         })
     }
 
-    fn wall_texture_image(
-        &mut self,
-        ui: &mut egui::Ui,
-        key: String,
-        texture: &TextureData,
-    ) -> TextureHandle {
+    fn tex_wall(&mut self, ui: &mut egui::Ui, key: String, texture: &TextureData) -> TextureHandle {
         if let Some(handle) = self.textures.get(&key) {
             return handle.clone();
         }
@@ -124,8 +121,8 @@ impl WolfEditor {
         handle
     }
 
-    fn checker_texture_image(&mut self, ui: &mut egui::Ui) -> TextureHandle {
-        let key = "checker";
+    fn tex_checker(&mut self, ui: &mut egui::Ui) -> TextureHandle {
+        let key = "tex-checker";
         if let Some(handle) = self.textures.get(key) {
             return handle.clone();
         }
@@ -147,8 +144,38 @@ impl WolfEditor {
         }
 
         let handle = ui.ctx().load_texture(
-            "checker",
+            key,
             ColorImage::from_rgba_unmultiplied([8, 8], &checker_data),
+            Default::default(),
+        );
+        self.textures.insert(key.to_string(), handle.clone());
+        handle
+    }
+
+    fn tex_door(&mut self, ui: &mut egui::Ui, vert: bool) -> TextureHandle {
+        let key = if vert { "tex-door-v" } else { "tex-door-h" };
+        if let Some(handle) = self.textures.get(key) {
+            return handle.clone();
+        }
+
+        let mut tex_data = vec![0u8; 8 * 8 * 4];
+
+        let x_range = if vert { 2..5 } else { 0..8 };
+
+        for x in x_range {
+            let y_range = if vert { 0..8 } else { 2..5 };
+            for y in y_range {
+                let i = (y * 8 + x) * 4;
+                tex_data[i] = 0x84;
+                tex_data[i + 1] = 0x84;
+                tex_data[i + 2] = 0x84;
+                tex_data[i + 3] = 0xFF;
+            }
+        }
+
+        let handle = ui.ctx().load_texture(
+            key,
+            ColorImage::from_rgba_unmultiplied([8, 8], &tex_data),
             Default::default(),
         );
         self.textures.insert(key.to_string(), handle.clone());
@@ -211,8 +238,13 @@ impl WolfEditor {
     fn render_tile_background(&mut self, ui: &mut egui::Ui, rect: Rect, wall: u16) {
         if wall < 107 {
             match wall {
+                1 => self.bg_colour(ui, rect, Color32::from_rgb(0x84, 0x84, 0x84)),
+                2 => self.bg_checker(ui, rect, Color32::from_rgb(0x84, 0x84, 0x84)),
                 8 => self.bg_colour(ui, rect, Color32::from_rgb(0x00, 0x00, 0x84)),
                 9 => self.bg_checker(ui, rect, Color32::from_rgb(0x00, 0x00, 0x84)),
+                12 => self.bg_colour(ui, rect, Color32::from_rgb(0xA5, 0x00, 0x00)),
+                90 => self.bg_door(ui, rect, true),
+                91 => self.bg_door(ui, rect, false),
                 _ => self.bg_colour(ui, rect, Color32::from_rgb(0x84, 0x84, 0x84)),
             }
         } else {
@@ -221,19 +253,28 @@ impl WolfEditor {
     }
 
     fn bg_checker(&mut self, ui: &mut egui::Ui, rect: Rect, bg_colour: Color32) {
-        ui.painter().rect_filled(rect, 0.0, bg_colour);
-
-        let checker_tex = self.checker_texture_image(ui);
-        ui.painter().image(
-            checker_tex.id(),
-            rect,
-            Rect::from_min_max(Pos2 { x: 0.0, y: 0.0 }, Pos2 { x: 1.0, y: 1.0 }),
-            Color32::WHITE,
-        );
+        let tex_id = self.tex_checker(ui).id();
+        self.bg_colour(ui, rect, bg_colour);
+        self.bg_tex(ui, rect, tex_id);
     }
 
     fn bg_colour(&self, ui: &mut egui::Ui, rect: Rect, colour: Color32) {
         ui.painter().rect_filled(rect, 0.0, colour);
+    }
+
+    fn bg_door(&mut self, ui: &mut egui::Ui, rect: Rect, vert: bool) {
+        let tex_id = self.tex_door(ui, vert).id();
+        self.bg_colour(ui, rect, Color32::BLACK);
+        self.bg_tex(ui, rect, tex_id);
+    }
+
+    fn bg_tex(&self, ui: &mut egui::Ui, rect: Rect, handle: TextureId) {
+        ui.painter().image(
+            handle,
+            rect,
+            Rect::from_min_max(Pos2 { x: 0.0, y: 0.0 }, Pos2 { x: 1.0, y: 1.0 }),
+            Color32::WHITE,
+        );
     }
 
     fn render_texture(&mut self, ui: &mut egui::Ui, which: u16, dir: bool) {
@@ -243,7 +284,7 @@ impl WolfEditor {
             let texture =
                 iw::gamedata::load_texture(&mut Cursor::new(&self.data.game_data), header)
                     .expect("texture");
-            let img = self.wall_texture_image(
+            let img = self.tex_wall(
                 ui,
                 format!("{}-wall{}", if dir { "v" } else { "h" }, which),
                 &texture,
