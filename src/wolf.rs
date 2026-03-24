@@ -1,9 +1,10 @@
 use egui::{
-    CentralPanel, Color32, ColorImage, Image, Pos2, Rect, RichText, TextureHandle, TextureId, Vec2,
+    CentralPanel, Color32, ColorImage, ComboBox, Image, Pos2, Rect, TextureHandle, TextureId, Vec2,
 };
 use iw::{
     gamedata::{GamedataHeaders, TextureData},
     map::{MapFileType, MapSegs, MapType},
+    web::load_map,
 };
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -37,11 +38,14 @@ struct Tile {
 
 pub struct WolfEditor {
     data: WolfData,
-    map: MapSegs,
+    map_data: MapSegs,
     menu_expanded: bool,
     selected_tile: Option<Tile>,
 
     textures: HashMap<String, TextureHandle>,
+
+    episode: usize,
+    map: usize,
 }
 
 enum Dir {
@@ -80,7 +84,7 @@ impl WolfEditor {
         let offsets = iw::map::load_map_offsets(&files.map_header_file)?;
         let (offsets, map_headers) = iw::map::load_map_headers(&files.map_file, offsets)?;
         let mut cursor = Cursor::new(&files.map_file);
-        let map = iw::map::load_map(&mut cursor, &map_headers, &offsets, 0)?;
+        let map_data = iw::map::load_map(&mut cursor, &map_headers, &offsets, 0)?;
 
         let game_data_headers = iw::gamedata::load_gamedata_headers(&files.game_data_file)?;
 
@@ -92,11 +96,25 @@ impl WolfEditor {
                 game_data: files.game_data_file,
                 game_data_headers,
             },
-            map,
+            map_data,
             menu_expanded: true,
             selected_tile: None,
             textures: HashMap::new(),
+            episode: 0,
+            map: 0,
         })
+    }
+
+    fn reload_map(&mut self) -> Result<(), String> {
+        let mut cursor = Cursor::new(&self.data.map_data);
+        let map_data = iw::map::load_map(
+            &mut cursor,
+            &self.data.map_headers,
+            &self.data.offsets,
+            self.episode * 10 + self.map,
+        )?;
+        self.map_data = map_data;
+        Ok(())
     }
 
     fn tex_wall(&mut self, ui: &mut egui::Ui, key: String, texture: &TextureData) -> TextureHandle {
@@ -327,8 +345,8 @@ impl WolfEditor {
 
     fn tile_at(&self, x: usize, y: usize) -> Tile {
         let ptr = y * 64 + x;
-        let wall = self.map.segs[0][ptr];
-        let info = self.map.segs[1][ptr];
+        let wall = self.map_data.segs[0][ptr];
+        let info = self.map_data.segs[1][ptr];
         Tile { x, y, wall, info }
     }
 }
@@ -343,6 +361,47 @@ impl EditorWidget for WolfEditor {
                     self.menu_expanded = !self.menu_expanded;
                 }
                 ui.label("Wolfenstein 3-D");
+                ui.add_space(70.0);
+
+                let episode_before = self.episode;
+                ui.label("Episode");
+                ComboBox::from_id_salt("cb_episode")
+                    .width(60.0)
+                    .selected_text(format!("{}", self.episode + 1))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.episode, 0, "1");
+                        ui.selectable_value(&mut self.episode, 1, "2");
+                        ui.selectable_value(&mut self.episode, 2, "3");
+                        ui.selectable_value(&mut self.episode, 3, "4");
+                        ui.selectable_value(&mut self.episode, 4, "5");
+                        ui.selectable_value(&mut self.episode, 5, "6");
+                    });
+                if episode_before != self.episode {
+                    self.reload_map().expect("map reload");
+                }
+
+                ui.add_space(15.0);
+
+                let map_before = self.map;
+                ui.label("Map");
+                ComboBox::from_id_salt("cb_map")
+                    .width(60.0)
+                    .selected_text(format!("{}", self.map + 1))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.map, 0, "1");
+                        ui.selectable_value(&mut self.map, 1, "2");
+                        ui.selectable_value(&mut self.map, 2, "3");
+                        ui.selectable_value(&mut self.map, 3, "4");
+                        ui.selectable_value(&mut self.map, 4, "5");
+                        ui.selectable_value(&mut self.map, 5, "6");
+                        ui.selectable_value(&mut self.map, 6, "7");
+                        ui.selectable_value(&mut self.map, 7, "8");
+                        ui.selectable_value(&mut self.map, 8, "9");
+                        ui.selectable_value(&mut self.map, 9, "10");
+                    });
+                if map_before != self.map {
+                    self.reload_map().expect("map reload");
+                }
             });
         });
 
