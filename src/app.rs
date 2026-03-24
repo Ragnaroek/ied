@@ -5,7 +5,7 @@ use eframe::egui::{Button, Color32, ColorImage, Pos2, RichText, Vec2};
 use egui::{FontDefinitions, FontFamily, Frame, Label, Rect, Response, TextureHandle};
 use poll_promise::Promise;
 
-use crate::wolf::{WolfEditor, WolfUpload};
+use crate::wolf::{WolfEditor, WolfUpload, WolfVariant};
 
 pub struct FileUpload {
     pub name: String,
@@ -68,6 +68,7 @@ impl IEd {
                 }
 
                 let mut wolf_files = WolfUpload {
+                    variant: crate::wolf::WolfVariant::WL1,
                     map_file: Vec::with_capacity(0),
                     map_header_file: Vec::with_capacity(0),
                     game_data_file: Vec::with_capacity(0),
@@ -75,13 +76,20 @@ impl IEd {
 
                 let mut found_files = 0;
                 for file_upload in file_uploads {
-                    if file_upload.name == "GAMEMAPS.WL6".to_string() {
+                    if file_upload.name.starts_with("GAMEMAPS.WL") {
                         wolf_files.map_file = file_upload.bytes.clone();
+                        if file_upload.name.ends_with("WL6") {
+                            wolf_files.variant = WolfVariant::WL6
+                        } else if file_upload.name.ends_with("WL3") {
+                            wolf_files.variant = WolfVariant::WL3;
+                        } else if file_upload.name.ends_with("WL1") {
+                            wolf_files.variant = WolfVariant::WL1;
+                        }
                         found_files += 1;
-                    } else if file_upload.name == "MAPHEAD.WL6".to_string() {
+                    } else if file_upload.name.starts_with("MAPHEAD.WL") {
                         wolf_files.map_header_file = file_upload.bytes.clone();
                         found_files += 1;
-                    } else if file_upload.name == "VSWAP.WL6".to_string() {
+                    } else if file_upload.name.starts_with("VSWAP.WL") {
                         wolf_files.game_data_file = file_upload.bytes.clone();
                         found_files += 1;
                     }
@@ -215,6 +223,7 @@ fn debug_init_wolf_editor() -> WolfEditor {
     let game_data_file = include_bytes!("../testdata/VSWAP.WL1").into();
 
     let mut wolf_files = WolfUpload {
+        variant: WolfVariant::WL1,
         map_file,
         map_header_file: header_file,
         game_data_file: game_data_file,

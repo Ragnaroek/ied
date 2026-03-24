@@ -14,13 +14,22 @@ use crate::app::EditorWidget;
 const TEXTURE_WIDTH: usize = 64;
 const TEXTURE_HEIGHT: usize = 64;
 
+#[derive(PartialEq)]
+pub enum WolfVariant {
+    WL1,
+    WL3,
+    WL6,
+}
+
 pub struct WolfUpload {
+    pub variant: WolfVariant,
     pub map_file: Vec<u8>,
     pub map_header_file: Vec<u8>,
     pub game_data_file: Vec<u8>,
 }
 
 struct WolfData {
+    variant: WolfVariant,
     offsets: MapFileType,
     map_headers: Vec<MapType>,
     map_data: Vec<u8>,
@@ -90,6 +99,7 @@ impl WolfEditor {
 
         Ok(WolfEditor {
             data: WolfData {
+                variant: files.variant,
                 offsets,
                 map_headers,
                 map_data: files.map_file,
@@ -370,8 +380,14 @@ impl EditorWidget for WolfEditor {
                     .selected_text(format!("{}", self.episode + 1))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.episode, 0, "1");
+                        if self.data.variant == WolfVariant::WL1 {
+                            return;
+                        }
                         ui.selectable_value(&mut self.episode, 1, "2");
                         ui.selectable_value(&mut self.episode, 2, "3");
+                        if self.data.variant == WolfVariant::WL3 {
+                            return;
+                        }
                         ui.selectable_value(&mut self.episode, 3, "4");
                         ui.selectable_value(&mut self.episode, 4, "5");
                         ui.selectable_value(&mut self.episode, 5, "6");
